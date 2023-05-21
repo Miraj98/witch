@@ -175,44 +175,6 @@ int setup_sdl(SDL_Window** window, SDL_Renderer** rend) {
         return -1;
     }
 
-/*
-    SDL_Surface* surface = IMG_Load("/Users/mirajshah/Downloads/avatar-1.png");
-    if (!surface) {
-        SDL_DestroyRenderer(*rend);
-        SDL_DestroyWindow(*window);
-        quit_sdl();
-        return -1;
-    }
-
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(*rend, surface);
-    SDL_FreeSurface(surface);
-    if (!texture) {
-        SDL_DestroyRenderer(*rend);
-        SDL_DestroyWindow(*window);
-        quit_sdl();
-        return -1;
-    }
-
-    SDL_RenderClear(*rend);
-    SDL_RenderCopy(*rend, texture, NULL, NULL);
-    SDL_RenderPresent(*rend);
-
-    while (!quit){
-        while (SDL_PollEvent(&e)){
-            if (e.type == SDL_QUIT){
-                quit = true;
-            }
-            if (e.type == SDL_KEYDOWN){
-                quit = true;
-            }
-            if (e.type == SDL_MOUSEBUTTONDOWN){
-                quit = true;
-            }
-        }
-    }
-*/
-
-
     return 0;
 }
 
