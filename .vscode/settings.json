@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "avformat.h": "c",
+        "sdl_image.h": "c"
+    }
+}

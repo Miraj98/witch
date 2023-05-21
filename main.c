@@ -1,49 +1,86 @@
+#include <stdio.h>
 #include "libavcodec/codec.h"
 #include "libavcodec/codec_par.h"
 #include "libavcodec/packet.h"
 #include "libavutil/avutil.h"
 #include "libavutil/frame.h"
 #include "libavutil/pixfmt.h"
-#include <stdio.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <SDL.h>
+#include <SDL_timer.h>
+#include <SDL_image.h>
+#include <stdbool.h>
 
-int get_codec(
-    const char* input,
-    enum AVMediaType codec_type,
-    int* stream_idx,
-    AVFormatContext** fc,
-    AVCodecContext** codec_ctx
-);
+int get_codec(const char* input, enum AVMediaType codec_type, int* stream_idx,
+              AVFormatContext** fc,
+              AVCodecContext** codec_ctx);
+int setup_sdl(SDL_Window** window, SDL_Renderer** renderer);
+void quit_sdl();
 
 int main() {
+    /* Setting up SDL*/
+    SDL_Window* window = NULL;
+    SDL_Renderer* renderer = NULL;
+    if (setup_sdl(&window, &renderer) != 0) {
+        return -1;
+    };
+
     AVFormatContext* format_context = NULL;
     AVCodecContext* codec_ctx = NULL;
     int stream_idx = -1;
-
     int ret = get_codec("richard-feynman.mp4", AVMEDIA_TYPE_VIDEO,
                         &stream_idx, &format_context, &codec_ctx);
     if (ret < 0) { return ret; }
-
     AVPacket pkt;
     AVFrame* frame = av_frame_alloc();
-    int iter = 0;
 
-    printf("Pixel format %d -> %d\n", codec_ctx->pix_fmt, AV_PIX_FMT_YUV420P);
+    int quit_render = 0;
+    SDL_Event e;
+    while (!quit_render) {
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT){
+                quit_render = true;
+            }
+            if (e.type == SDL_KEYDOWN){
+                quit_render = true;
+            }
+            if (e.type == SDL_MOUSEBUTTONDOWN){
+                quit_render = true;
+            }
+        }
 
-    while (av_read_frame(format_context, &pkt) >= 0) {
-        if (pkt.stream_index == stream_idx) {
-            if (avcodec_send_packet(codec_ctx, &pkt) < 0) {
-                fprintf(stderr, "Error sending packet to the codec\n");
+        if (av_read_frame(format_context, &pkt) < 0) {
+            quit_render = 1;
+        }
+
+        if (avcodec_send_packet(codec_ctx, &pkt) < 0) {
+            quit_render = 1;
+            fprintf(stderr, "Error sending packet to the codec\n");
+        }
+
+        while (avcodec_receive_frame(codec_ctx, frame) == 0) {
+            SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, frame->width, frame->height);
+            if (!texture) {
+                SDL_DestroyRenderer(renderer);
+                SDL_DestroyWindow(window);
+                quit_sdl();
                 return -1;
             }
-
-            while (avcodec_receive_frame(codec_ctx, frame) == 0) {
-                // Do something with the frame
-            }
+            SDL_UpdateYUVTexture(texture, NULL,
+                                 frame->data[0], frame->linesize[0],
+                                 frame->data[1], frame->linesize[1],
+                                 frame->data[2], frame->linesize[2]);
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, texture, NULL, NULL);
+            SDL_RenderPresent(renderer);
+            SDL_Delay(1000/30);
         }
     }
 
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
     return 0;
 }
@@ -79,8 +116,6 @@ int get_codec(
         }
     }
 
-    printf("This the pixel format -> %d", codec_params->format);
-
     if (*stream_idx == -1 || codec_params == NULL || codec == NULL) {
         fprintf(stderr, "Error finding video stream or decoder");
         return -3;
@@ -105,4 +140,75 @@ int get_codec(
     }
 
     return 0;
+}
+
+int setup_sdl(SDL_Window** window, SDL_Renderer** rend) {
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_TIMER) != 0) {
+        fprintf(stderr, "[SDL ERROR] %s\n", SDL_GetError());
+        return -1;
+    }
+
+    *window = SDL_CreateWindow("Video streamer",
+                                SDL_WINDOWPOS_CENTERED,
+                                SDL_WINDOWPOS_CENTERED,
+                                640, 800, 0);
+    if (!(*window)) {
+        quit_sdl();
+        return -1;
+    }
+
+    Uint32 render_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+    *rend = SDL_CreateRenderer(*window, -1, render_flags);
+
+
+    if (!(*rend)) {
+        SDL_DestroyWindow(*window);
+        quit_sdl();
+        return -1;
+    }
+
+/*
+    SDL_Surface* surface = IMG_Load("/Users/mirajshah/Downloads/avatar-1.png");
+    if (!surface) {
+        SDL_DestroyRenderer(*rend);
+        SDL_DestroyWindow(*window);
+        quit_sdl();
+        return -1;
+    }
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(*rend, surface);
+    SDL_FreeSurface(surface);
+    if (!texture) {
+        SDL_DestroyRenderer(*rend);
+        SDL_DestroyWindow(*window);
+        quit_sdl();
+        return -1;
+    }
+
+    SDL_RenderClear(*rend);
+    SDL_RenderCopy(*rend, texture, NULL, NULL);
+    SDL_RenderPresent(*rend);
+
+    while (!quit){
+        while (SDL_PollEvent(&e)){
+            if (e.type == SDL_QUIT){
+                quit = true;
+            }
+            if (e.type == SDL_KEYDOWN){
+                quit = true;
+            }
+            if (e.type == SDL_MOUSEBUTTONDOWN){
+                quit = true;
+            }
+        }
+    }
+*/
+
+
+    return 0;
+}
+
+void quit_sdl() {
+    fprintf(stderr, "[SDL ERROR] %s\n", SDL_GetError());
+    SDL_Quit();
 }
