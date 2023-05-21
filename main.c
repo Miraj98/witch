@@ -26,6 +26,7 @@ int main() {
         return -1;
     };
 
+    /* Setting video codec */
     AVFormatContext* format_context = NULL;
     AVCodecContext* codec_ctx = NULL;
     int stream_idx = -1;
@@ -35,6 +36,11 @@ int main() {
     AVPacket pkt;
     AVFrame* frame = av_frame_alloc();
 
+    SDL_Rect destrect;
+    destrect.x = 0;
+    destrect.y = 0;
+
+    /* Render loop */
     int quit_render = 0;
     SDL_Event e;
     while (!quit_render) {
@@ -60,6 +66,8 @@ int main() {
         }
 
         while (avcodec_receive_frame(codec_ctx, frame) == 0) {
+            destrect.h = frame->height;
+            destrect.w = frame->width;
             SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, frame->width, frame->height);
             if (!texture) {
                 SDL_DestroyRenderer(renderer);
@@ -72,7 +80,7 @@ int main() {
                                  frame->data[1], frame->linesize[1],
                                  frame->data[2], frame->linesize[2]);
             SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, texture, NULL, NULL);
+            SDL_RenderCopy(renderer, texture, NULL, &destrect);
             SDL_RenderPresent(renderer);
             SDL_Delay(1000/30);
         }
