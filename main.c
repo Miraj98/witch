@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
                 SDL_RenderClear(renderer);
                 SDL_RenderCopy(renderer, texture, NULL, &destrect);
                 SDL_RenderPresent(renderer);
-                SDL_Delay(1000/30);
+                SDL_Delay(1000/60);
             }
         } else if (pkt.stream_index == audio_stream_id) {
             packet_queue_put(&queue, &pkt);
@@ -325,7 +325,7 @@ void quit_sdl() {
 
 int audio_decode_frame(AVCodecContext* audio_codec_ctx, uint8_t* audio_buf, int buf_size) {
     AVPacket pkt;
-    AVFrame audio_frame;
+    AVFrame *audio_frame = av_frame_alloc();
     if (packet_queue_get(&queue, &pkt, 1) == 1) {
         if (avcodec_send_packet(audio_codec_ctx, &pkt) != 0 ) {
             fprintf(stderr, "[FFMPEG ERROR] Unable to send packet to the decoder. Have you already opened the decoder using avcodec_open2?\n.");
@@ -333,15 +333,23 @@ int audio_decode_frame(AVCodecContext* audio_codec_ctx, uint8_t* audio_buf, int 
         }
 
         int num_frames = 0;
+        int data_size = 0;
 
-        while (avcodec_receive_frame(audio_codec_ctx, &audio_frame) == 0) {
+        while (avcodec_receive_frame(audio_codec_ctx, audio_frame) == 0) {
             num_frames++;
-            // int bufsize = av_samples_get_buffer_size(NULL, audio_codec_ctx->channels, audio_frame.nb_samples, audio_codec_ctx->sample_fmt, 1);
-            // memcpy(audio_buf, audio_frame.data[0], bufsize);
+            int bufsize = av_samples_get_buffer_size(NULL, audio_codec_ctx->channels, audio_frame->nb_samples, audio_codec_ctx->sample_fmt, 1);
+            memcpy(audio_buf, audio_frame->data[0], bufsize);
+            data_size += buf_size;
         }
+
+        SDL_assert(data_size <= buf_size);
+
+        return data_size;
 
         printf("Number of audio frames: %d\n", num_frames);
     }
+
+    av_frame_free(&audio_frame);
 
     return -1;
 }
