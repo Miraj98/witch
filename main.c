@@ -12,13 +12,23 @@
 #include <SDL_image.h>
 #include <stdbool.h>
 
+#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 800
+
 int get_codec(const char* input, enum AVMediaType codec_type, int* stream_idx,
               AVFormatContext** fc,
               AVCodecContext** codec_ctx);
 int setup_sdl(SDL_Window** window, SDL_Renderer** renderer);
 void quit_sdl();
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Provide a video file.\n");
+        return -1;
+    }
+
+    printf("File path provided: %s\n", argv[1]);
+
     /* Setting up SDL*/
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
@@ -28,17 +38,15 @@ int main() {
 
     /* Setting video codec */
     AVFormatContext* format_context = NULL;
-    AVCodecContext* codec_ctx = NULL;
-    int stream_idx = -1;
-    int ret = get_codec("richard-feynman.mp4", AVMEDIA_TYPE_VIDEO,
-                        &stream_idx, &format_context, &codec_ctx);
+    AVCodecContext* video_codec_ctx = NULL;
+    int video_stream_id = -1;
+    int ret = get_codec(argv[1], AVMEDIA_TYPE_VIDEO,
+                        &video_stream_id, &format_context, &video_codec_ctx);
     if (ret < 0) { return ret; }
     AVPacket pkt;
     AVFrame* frame = av_frame_alloc();
 
-    SDL_Rect destrect;
-    destrect.x = 0;
-    destrect.y = 0;
+    SDL_Rect destrect = {.x = 0, .y = 0, .h = -1, .w = -1};
 
     /* Render loop */
     int quit_render = 0;
@@ -60,14 +68,25 @@ int main() {
             quit_render = 1;
         }
 
-        if (avcodec_send_packet(codec_ctx, &pkt) < 0) {
+        if (pkt.stream_index != video_stream_id) {
+            continue;
+        }
+
+        if (avcodec_send_packet(video_codec_ctx, &pkt) < 0) {
             quit_render = 1;
             fprintf(stderr, "Error sending packet to the codec\n");
         }
 
-        while (avcodec_receive_frame(codec_ctx, frame) == 0) {
-            destrect.h = frame->height;
-            destrect.w = frame->width;
+        while (avcodec_receive_frame(video_codec_ctx, frame) == 0) {
+            if (destrect.h == -1) {
+                destrect.h = frame->height;
+                if (frame->width > WINDOW_WIDTH) {
+                    destrect.w = WINDOW_WIDTH;
+                    destrect.h = (frame->height * destrect.w)/frame->width;
+                } else {
+                    destrect.w = frame->width;
+                }
+            }
             SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, frame->width, frame->height);
             if (!texture) {
                 SDL_DestroyRenderer(renderer);
@@ -159,7 +178,7 @@ int setup_sdl(SDL_Window** window, SDL_Renderer** rend) {
     *window = SDL_CreateWindow("Video streamer",
                                 SDL_WINDOWPOS_CENTERED,
                                 SDL_WINDOWPOS_CENTERED,
-                                640, 800, 0);
+                                WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     if (!(*window)) {
         quit_sdl();
         return -1;
