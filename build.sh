@@ -1,6 +1,5 @@
 gcc main.c\
-	-lavdecode\
-	-lavcodec -lavformat\
+	-lavcodec -lavformat -lswresample\
 	-lSDL2 -lSDL2_image\
 	-o build/main\
 	-I include\
