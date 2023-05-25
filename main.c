@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
     //     return -1;
     // }
     SDL_Event event;
-    const char *input = "av2.mp4";
+    const char *input = "richard-feynman.mp4";
     MediaPlayerState *mp = alloc_media_player_state();
     if (mp == NULL) {
         return -1;

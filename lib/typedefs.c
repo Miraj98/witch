@@ -4,11 +4,7 @@
 #include <SDL.h>
 
 #define VIDEO_FRAME_BUFFER_SIZE 10
-
-typedef struct VideoFrame {
-    SDL_Texture *texture;
-    int allocated;
-} VideoFrame;
+#define REFRESH_VIDEO_DISPLAY (SDL_USEREVENT)
 
 typedef struct PacketItem {
     AVPacket pkt;
@@ -30,7 +26,9 @@ typedef struct MediaPlayerState {
     int video_stream_id, audio_stream_id;
     int audio_device_id;
 
-    VideoFrame framebuffer[VIDEO_FRAME_BUFFER_SIZE];
+    AVFrame* framebuffer[VIDEO_FRAME_BUFFER_SIZE];
+    int frame_read_index;
+    int frame_write_index;
     SDL_mutex *framebuffer_mutex;
     SDL_cond *framebuffer_cond;
 
@@ -47,6 +45,9 @@ MediaPlayerState* alloc_media_player_state() {
         fprintf(stderr, "Failed to allocate memory for the media player.\n");
         return NULL;
     }
+    m->video_stream_id = -1;
+    m->audio_stream_id = -1;
+
     m->framebuffer_mutex = SDL_CreateMutex();
     m->framebuffer_cond = SDL_CreateCond();
 
@@ -103,6 +104,7 @@ int pkt_queue_get(PacketQueue *pkt_queue, AVPacket *pkt, MediaPlayerState *m) {
             pkt_queue->size -= pkt_item->pkt.size;
             *pkt = pkt_item->pkt;
             av_free(pkt_item);
+            break;
         } else {
             SDL_CondWait(pkt_queue->cond, pkt_queue->mutex);
         }

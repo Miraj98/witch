@@ -1,6 +1,8 @@
 #include "typedefs.c"
 #include <libswresample/swresample.h>
 
+int video_decoder(void *);
+
 int open_codec(const char *filepath, MediaPlayerState *mp)
 {
     if (mp->fmt_ctx == NULL) {
@@ -53,6 +55,7 @@ int open_codec(const char *filepath, MediaPlayerState *mp)
                 break;
             case AVMEDIA_TYPE_VIDEO:
                 mp->video_stream_id = i;
+                mp->video_tid = SDL_CreateThread(video_decoder, "video-decoder", mp);
                 const AVCodec *vCodec = avcodec_find_decoder(mp->fmt_ctx->streams[i]->codecpar->codec_id);
                 if (vCodec == NULL) {
                     fprintf(stderr, "Unable to find the decoder.\n");
@@ -84,8 +87,9 @@ int decoder_thread(void *arg) {
     MediaPlayerState *mp = (MediaPlayerState *)arg;
     AVPacket pkt;
 
-    while (!mp->quit) {
+    while (1) {
         if (av_read_frame(mp->fmt_ctx, &pkt) < 0) {
+            printf("Read total %d packets.\n", mp->video_pkt_queue.nb_packets);
             printf("No more packets to read from the source.\n");
             break;
         }
@@ -94,15 +98,6 @@ int decoder_thread(void *arg) {
             if (pkt_queue_put(&mp->video_pkt_queue, &pkt) != 0) {
                 break;
             };
-            // if (avcodec_send_packet(mp->video_codec_ctx, pkt) != 0) {
-            //     fprintf(stderr, "Failed to send the packet to the decoder.\n");
-            //     break;
-            // }
-
-            // if (avcodec_receive_frame(mp->video_codec_ctx, frame) != 0) {
-            //     fprintf(stderr, "Unable to receive decoded frame.\n");
-            //     break;
-            // }
         }
 
         if (pkt.stream_index == mp->audio_stream_id) {
@@ -113,4 +108,39 @@ int decoder_thread(void *arg) {
     }
 
     return 0;
+}
+
+int video_decoder(void *arg) {
+    MediaPlayerState *m = (MediaPlayerState *)arg;
+    AVPacket pkt;
+    AVFrame *frame = av_frame_alloc();
+
+    while (1) {
+        // Should hang the thread until a new pkt is received, unless there are no more packets left in which case this should return with -1
+        if (pkt_queue_get(&m->video_pkt_queue, &pkt, m) != 0) {
+            break;
+        }
+
+        if (avcodec_send_packet(m->video_codec_ctx, &pkt) != 0) {
+            fprintf(stderr, "Failed to send the packet to the decoder.\n");
+            return -1;
+        }
+
+        while (avcodec_receive_frame(m->video_codec_ctx, frame) == 0) {
+            SDL_LockMutex(m->framebuffer_mutex);
+            while (1) {
+                if (m->framebuffer[m->frame_write_index] != NULL) {
+                    m->framebuffer[m->frame_write_index] = frame;
+                    m->frame_write_index = (m->frame_write_index + 1) % VIDEO_FRAME_BUFFER_SIZE;
+                    break;
+                } else {
+                    printf("Frame buffer full, waiting for space in the buffer - %d\n.", m->frame_write_index);
+                    SDL_CondWait(m->framebuffer_cond, m->framebuffer_mutex);
+                    printf("Frame buffer now has space, attempting to a new frame \n.");
+                } 
+            }
+            SDL_UnlockMutex(m->framebuffer_mutex);
+        }
+    }
+    return -1;
 }
