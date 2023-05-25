@@ -36,6 +36,8 @@ typedef struct MediaPlayerState {
 
     PacketQueue video_pkt_queue, audio_pkt_queue;
 
+    SDL_Thread *decoder_tid, *video_tid;
+
     int quit;
 } MediaPlayerState;
 
@@ -99,8 +101,8 @@ int pkt_queue_get(PacketQueue *pkt_queue, AVPacket *pkt, MediaPlayerState *m) {
             }
             pkt_queue->nb_packets--;
             pkt_queue->size -= pkt_item->pkt.size;
-
             *pkt = pkt_item->pkt;
+            av_free(pkt_item);
         } else {
             SDL_CondWait(pkt_queue->cond, pkt_queue->mutex);
         }

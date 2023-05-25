@@ -80,27 +80,37 @@ int open_codec(const char *filepath, MediaPlayerState *mp)
     return 0;
 }
 
-void decoder_thread(void *arg) {
+int decoder_thread(void *arg) {
     MediaPlayerState *mp = (MediaPlayerState *)arg;
-    AVPacket *pkt = NULL;
-    AVFrame *frame = av_frame_alloc();
+    AVPacket pkt;
 
     while (!mp->quit) {
-        if (av_read_frame(mp->fmt_ctx, pkt) < 0) {
+        if (av_read_frame(mp->fmt_ctx, &pkt) < 0) {
             printf("No more packets to read from the source.\n");
             break;
         }
 
-        if (pkt->stream_index == mp->video_stream_id) {
-            if (avcodec_send_packet(mp->video_codec_ctx, pkt) != 0) {
-                fprintf(stderr, "Failed to send the packet to the decoder.\n");
+        if (pkt.stream_index == mp->video_stream_id) {
+            if (pkt_queue_put(&mp->video_pkt_queue, &pkt) != 0) {
                 break;
-            }
+            };
+            // if (avcodec_send_packet(mp->video_codec_ctx, pkt) != 0) {
+            //     fprintf(stderr, "Failed to send the packet to the decoder.\n");
+            //     break;
+            // }
 
-            if (avcodec_receive_frame(mp->video_codec_ctx, frame) != 0) {
-                fprintf(stderr, "Unable to receive decoded frame.\n");
+            // if (avcodec_receive_frame(mp->video_codec_ctx, frame) != 0) {
+            //     fprintf(stderr, "Unable to receive decoded frame.\n");
+            //     break;
+            // }
+        }
+
+        if (pkt.stream_index == mp->audio_stream_id) {
+            if (pkt_queue_put(&mp->audio_pkt_queue, &pkt) != 0) {
                 break;
-            }
+            };
         }
     }
+
+    return 0;
 }
