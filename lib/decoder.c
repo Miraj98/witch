@@ -1,5 +1,9 @@
-#include "typedefs.c"
 #include <libswresample/swresample.h>
+#include <libavutil/avutil.h>
+
+#ifndef DECODER
+#define DECODER
+#include "typedefs.c"
 
 int video_decoder(void *);
 
@@ -113,7 +117,7 @@ int decoder_thread(void *arg) {
 int video_decoder(void *arg) {
     MediaPlayerState *m = (MediaPlayerState *)arg;
     AVPacket pkt;
-    AVFrame *frame = av_frame_alloc();
+
 
     while (1) {
         // Should hang the thread until a new pkt is received, unless there are no more packets left in which case this should return with -1
@@ -126,17 +130,28 @@ int video_decoder(void *arg) {
             return -1;
         }
 
-        while (avcodec_receive_frame(m->video_codec_ctx, frame) == 0) {
+        AVFrame frame;
+
+        while (avcodec_receive_frame(m->video_codec_ctx, &frame) == 0) {
             SDL_LockMutex(m->framebuffer_mutex);
             while (1) {
-                if (m->framebuffer[m->frame_write_index] != NULL) {
-                    m->framebuffer[m->frame_write_index] = frame;
+                if (m->framebuffer[m->frame_write_index].allocated == 0) {
+                    if (m->display->rect.h == -1) {
+                        m->display->rect.h = frame.height;
+                        m->display->rect.w = frame.width;
+                    }
+                    m->framebuffer[m->frame_write_index].frame = frame;
+                    m->framebuffer[m->frame_write_index].allocated = 1;
                     m->frame_write_index = (m->frame_write_index + 1) % VIDEO_FRAME_BUFFER_SIZE;
+                    SDL_CondSignal(m->framebuffer_cond);
+                    SDL_Event e;
+                    e.type = REFRESH_VIDEO_DISPLAY;
+                    int resp = SDL_PushEvent(&e);
                     break;
                 } else {
-                    printf("Frame buffer full, waiting for space in the buffer - %d\n.", m->frame_write_index);
+                    printf("Frame buffer full, waiting for space in the buffer: %d\n", m->frame_write_index);
                     SDL_CondWait(m->framebuffer_cond, m->framebuffer_mutex);
-                    printf("Frame buffer now has space, attempting to a new frame \n.");
+                    printf("Frame buffer now has space, attempting to a new frame.\n");
                 } 
             }
             SDL_UnlockMutex(m->framebuffer_mutex);
@@ -144,3 +159,4 @@ int video_decoder(void *arg) {
     }
     return -1;
 }
+#endif

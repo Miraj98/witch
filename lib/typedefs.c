@@ -3,8 +3,16 @@
 #include <libswresample/swresample.h>
 #include <SDL.h>
 
+#ifndef TYPEDEFS
+#define TYPEDEFS
+
 #define VIDEO_FRAME_BUFFER_SIZE 10
-#define REFRESH_VIDEO_DISPLAY (SDL_USEREVENT)
+#define REFRESH_VIDEO_DISPLAY (SDL_USEREVENT + 1)
+
+typedef struct FrameBufferItem {
+    AVFrame frame;
+    int allocated;
+} FrameBufferItem;
 
 typedef struct PacketItem {
     AVPacket pkt;
@@ -19,14 +27,22 @@ typedef struct PacketQueue {
     SDL_cond *cond;
 } PacketQueue;
 
+typedef struct DisplayOutput {
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
+    SDL_Rect rect;
+} DisplayOutput;
+
 typedef struct MediaPlayerState {
     AVFormatContext *fmt_ctx;
     AVCodecContext *video_codec_ctx, *audio_codec_ctx;
     SwrContext *resampler_ctx;
     int video_stream_id, audio_stream_id;
     int audio_device_id;
+    DisplayOutput *display;
 
-    AVFrame* framebuffer[VIDEO_FRAME_BUFFER_SIZE];
+    FrameBufferItem framebuffer[VIDEO_FRAME_BUFFER_SIZE];
     int frame_read_index;
     int frame_write_index;
     SDL_mutex *framebuffer_mutex;
@@ -56,6 +72,12 @@ MediaPlayerState* alloc_media_player_state() {
 
     m->audio_pkt_queue.mutex = SDL_CreateMutex();
     m->audio_pkt_queue.cond = SDL_CreateCond();
+
+    m->display = SDL_malloc(sizeof(DisplayOutput));
+    m->display->rect.h = -1;
+    m->display->rect.w = -1;
+    m->display->rect.x = 0;
+    m->display->rect.y = 0;
 
     return m;
 }
@@ -112,3 +134,5 @@ int pkt_queue_get(PacketQueue *pkt_queue, AVPacket *pkt, MediaPlayerState *m) {
     SDL_UnlockMutex(pkt_queue->mutex);
     return ret;
 }
+
+#endif

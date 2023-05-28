@@ -1,4 +1,5 @@
 #include "lib/decoder.c"
+#include "lib/output.c"
 
 int main(int argc, char *argv[]) {
     // if (argc < 2) {
@@ -16,18 +17,32 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    mp->decoder_tid = SDL_CreateThread(decoder_thread, "decoder-thread", mp);
+    if (setup_sdl(mp) != 0) {
+        return -1;
+    }
 
-    for (;;) {
-        SDL_WaitEvent(&event);
-        switch (event.type) {
-            case SDL_QUIT:
-                mp->quit = 1;
-                break;
-            default:
-                break;
+
+    mp->decoder_tid = SDL_CreateThread(decoder_thread, "decoder-thread", mp);
+    // SDL_AddTimer(16, display_frame, (void *)mp);
+
+    while (!mp->quit) {
+        while (SDL_PollEvent(&event)) {
+            switch (event.type) {
+                case SDL_QUIT:
+                    mp->quit = 1;
+                    break;
+                case REFRESH_VIDEO_DISPLAY:
+                    printf("REFRESH VIDEO being called.\n");
+                    display_frame(mp);
+                default:
+                    break;
+            }
         }
     }
+
+    SDL_DestroyRenderer(mp->display->renderer);
+    SDL_DestroyWindow(mp->display->window);
+    SDL_Quit();
 
     return 0;
 }
