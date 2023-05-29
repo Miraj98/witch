@@ -118,7 +118,6 @@ int video_decoder(void *arg) {
     MediaPlayerState *m = (MediaPlayerState *)arg;
     AVPacket pkt;
 
-
     while (1) {
         // Should hang the thread until a new pkt is received, unless there are no more packets left in which case this should return with -1
         if (pkt_queue_get(&m->video_pkt_queue, &pkt, m) != 0) {
@@ -131,7 +130,6 @@ int video_decoder(void *arg) {
         }
 
         AVFrame frame;
-
         while (avcodec_receive_frame(m->video_codec_ctx, &frame) == 0) {
             SDL_LockMutex(m->framebuffer_mutex);
             while (1) {
@@ -149,9 +147,7 @@ int video_decoder(void *arg) {
                     int resp = SDL_PushEvent(&e);
                     break;
                 } else {
-                    printf("Frame buffer full, waiting for space in the buffer: %d\n", m->frame_write_index);
                     SDL_CondWait(m->framebuffer_cond, m->framebuffer_mutex);
-                    printf("Frame buffer now has space, attempting to a new frame.\n");
                 } 
             }
             SDL_UnlockMutex(m->framebuffer_mutex);

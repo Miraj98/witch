@@ -58,6 +58,7 @@ int display_frame(MediaPlayerState *m) {
             m->framebuffer[m->frame_read_index].allocated = 0;
             // av_frame_free(m->framebuffer[m->frame_read_index].frame);
             m->frame_read_index = (m->frame_read_index + 1) % VIDEO_FRAME_BUFFER_SIZE;
+            SDL_CondSignal(m->framebuffer_cond);
             break;
         } else {
             SDL_CondWait(m->framebuffer_cond, m->framebuffer_mutex);

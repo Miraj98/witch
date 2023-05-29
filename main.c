@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
     //     return -1;
     // }
     SDL_Event event;
-    const char *input = "richard-feynman.mp4";
+    const char *input = "av2.mp4";
     MediaPlayerState *mp = alloc_media_player_state();
     if (mp == NULL) {
         return -1;
@@ -32,7 +32,6 @@ int main(int argc, char *argv[]) {
                     mp->quit = 1;
                     break;
                 case REFRESH_VIDEO_DISPLAY:
-                    printf("REFRESH VIDEO being called.\n");
                     display_frame(mp);
                 default:
                     break;
