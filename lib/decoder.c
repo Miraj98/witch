@@ -2,8 +2,8 @@
 #include <libavutil/avutil.h>
 
 #ifndef DECODER
-#define DECODER
 #include "typedefs.c"
+#include "output.c"
 
 int video_decoder(void *);
 
@@ -137,6 +137,10 @@ int video_decoder(void *arg) {
                     if (m->display->rect.h == -1) {
                         m->display->rect.h = frame.height;
                         m->display->rect.w = frame.width;
+                        if (m->display->rect.w > WINDOW_WIDTH) {
+                            m->display->rect.w = WINDOW_WIDTH;
+                            m->display->rect.h = (frame.height * m->display->rect.w) / frame.width;
+                        }
                     }
                     m->framebuffer[m->frame_write_index].frame = frame;
                     m->framebuffer[m->frame_write_index].allocated = 1;

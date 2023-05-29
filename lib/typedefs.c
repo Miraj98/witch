@@ -47,6 +47,9 @@ typedef struct MediaPlayerState {
     int frame_write_index;
     SDL_mutex *framebuffer_mutex;
     SDL_cond *framebuffer_cond;
+    int audio_buffer_index;
+    int audio_buffer_size;
+    uint8_t *audio_buffer;
 
     PacketQueue video_pkt_queue, audio_pkt_queue;
 
